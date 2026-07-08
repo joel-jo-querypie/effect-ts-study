@@ -42,6 +42,7 @@ export const FileTodoRepositoryLive = Layer.effect(
 
     const writeAll = (todos: ReadonlyArray<Todo>) =>
       Effect.gen(function* () {
+        // readonly 지만 경계에서는 schema를 통과시키는게?
         const valid = yield* validateTodoFileData(todos);
         yield* fs
           .writeFileString(file, JSON.stringify(valid, null, 2))

@@ -4,6 +4,8 @@ import { listTodos } from "../programs";
 import { Todo } from "../domain/todo";
 
 export const listCommand = Command.make("list", {}, () =>
+  // Console.log를 Output service로 말아?
+  // readonly printLine: (line: string) => Effet.Effect<void>}
   listTodos.pipe(Effect.map(renderTodoList), Effect.flatMap(Console.log)),
 );
 
@@ -18,6 +20,7 @@ const renderTodoStatus = (todo: Todo): string => {
   }
 };
 
+// 무슨 일이 일어났는지 Todo Result 타입으로 표기 되었고, 어댑터인 ui 레이어에서 어떻게 보여줄지 결정하는
 const renderTodoList = (todos: ReadonlyArray<Todo>): string => {
   if (todos.length === 0) {
     return "no todos";
@@ -33,8 +36,12 @@ const renderTodoList = (todos: ReadonlyArray<Todo>): string => {
         case "CompletedTodo":
           return `${renderTodoStatus(todo)} ${todo.id} ${todo.title} completed at ${todo.completedAtMillis}(ms)`;
         default:
-          return "";
+          assertNever(todo);
       }
     })
     .join("\n");
 };
+
+const assertNever = (value: never) => {
+  throw new Error(`${value}`)
+}
