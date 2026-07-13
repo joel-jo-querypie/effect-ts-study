@@ -23,16 +23,19 @@ DELETE /todos/:id
 
 RPC를 선택한다면 같은 의미의 `createTodo`, `listTodos`, `completeTodo`, `deleteTodo` operation을 제공한다.
 
-중점 학습:
+## 이 과제를 통해 배우는 것
 
-- CLI adapter를 HTTP/RPC adapter로 바꾸어도 core program 구조가 유지되는지 확인
-- request validation (`Effect.Schema` 사용 권장)
-- typed error를 표준 HTTP/RPC error response로 변환
-- 모든 요청에 `requestId` 부여
-- 실제 DB를 사용한 transaction boundary 구성
-- Todo mutation과 audit log append를 하나의 transaction으로 묶기
-- 선택 확장: rejected/query action도 audit log로 남기기
-- repository, id generator, audit log 저장 구현을 `Layer`로 교체 가능하게 만들기
+이번 과제는 Todo CRUD보다, `Effect<A, E, R>`와 `Layer`를 사용해 서버 프로그램을 조립하고 실행 환경을 교체하는 경험에 초점을 둔다.
+
+- `Effect<A, E, R>`로 성공, 실패, 의존성을 분리해서 생각하기
+- `Effect.gen`으로 domain validation, repository call, audit logging을 하나의 program으로 조합하기
+- throw 대신 typed error channel로 예상 가능한 실패를 표현하기
+- `Schema`로 외부 request를 안전한 domain value로 변환하기
+- `Context.Tag`와 `Layer`로 service interface와 구현체를 분리하기
+- Layer composition으로 file/in-memory 구현을 DB-backed 구현으로 교체하기
+- `Scope`와 Layer lifecycle로 HTTP server와 DB connection resource 관리하기
+- transaction boundary를 effectful program으로 모델링하기
+- fake/test Layer를 주입해 성공, 실패, rollback 시나리오 검증하기
 
 ## 프로젝트 세팅 방법
 
@@ -88,6 +91,7 @@ pnpm --filter effect-todo-server copy:cli-core -- --force
 
 이 스크립트는 시작점만 만들어준다.
 복사 후에는 file-backed layer를 DB-backed transaction/audit layer로 바꾸는 것이 이번 과제의 핵심이다.
+기존 CLI core에는 delete use case가 없으므로, 서버 과제에서는 delete program과 repository method를 새로 추가한다.
 
 placeholder entrypoint는 바로 실행해볼 수 있다.
 
@@ -102,3 +106,38 @@ pnpm dev
 DB-backed repository, transaction, audit log 구현은 `src/layers` 아래에 자유롭게 배치한다.
 파일이 많아지면 `src/layers/sqlite` 같은 하위 디렉토리를 만들거나, 선택적으로 `src/db`를 만들어 DB 관련 파일만 따로 관리해도 된다.
 레이어별 책임과 세부 요구사항은 [Spec](./docs/spec.md)을 참고한다.
+
+## 완료 기준
+
+기본 검증 명령이 통과해야 한다.
+
+```bash
+pnpm typecheck
+pnpm lint
+pnpm test
+```
+
+선택한 transport가 실제 서버를 대상으로 호출 가능해야 한다.
+
+HTTP를 선택했다면 `pnpm dev`로 서버를 띄운 뒤 아래 흐름을 `curl`로 재현한다.
+
+```bash
+curl -i -X POST http://localhost:3000/todos \
+  -H 'content-type: application/json' \
+  -H 'x-request-id: req-create-1' \
+  -d '{"title":"learn Effect server"}'
+
+curl -i http://localhost:3000/todos \
+  -H 'x-request-id: req-list-1'
+
+curl -i -X POST http://localhost:3000/todos/<todo-id>/complete \
+  -H 'x-request-id: req-complete-1'
+
+curl -i -X DELETE http://localhost:3000/todos/<todo-id> \
+  -H 'x-request-id: req-delete-1'
+```
+
+RPC를 선택했다면 같은 흐름을 실제 서버에 호출하는 client script나 integration test를 제공한다.
+
+audit log는 별도 조회 API로 노출하지 않아도 된다.
+대신 test, DB query script, 또는 README 재현 절차로 successful mutation의 Todo 변경과 `audit_logs` insert가 같은 transaction 안에서 함께 성공/실패함을 보여준다.

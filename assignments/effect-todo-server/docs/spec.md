@@ -1,4 +1,4 @@
-# Spec: Effect Todo HTTP/RPC Server 손코딩 과제
+# Spec: Effect Todo HTTP/RPC Server 과제
 
 ## 목표
 
@@ -19,6 +19,8 @@ outbox, queue, fire-and-forget 같은 비동기 side effect는 범위 밖이다.
 이번 과제에서는 audit log를 Todo와 동일한 DB 안에 저장한다고 가정한다.
 
 - Todo state와 audit log는 같은 persistence boundary 안에 있다.
+- audit log는 Todo state와 분리된 append-only 저장소에 남긴다.
+- RDB를 사용한다면 `todos` 테이블과 별도의 `audit_logs` 테이블을 만든다.
 - 성공한 mutation의 Todo 변경과 audit log append는 하나의 DB transaction으로 묶는다.
 - audit log insert가 실패하면 API는 성공하면 안 된다.
 - transaction commit/rollback은 DB에 맡긴다.
@@ -88,6 +90,7 @@ pnpm copy:cli-core
 
 복사된 file-backed layer는 최종 답이 아니다.
 이번 과제에서는 DB-backed repository, transaction runner, audit log layer로 교체해야 한다.
+또한 기존 CLI core에는 delete use case가 없으므로, 서버 과제에서는 delete program과 repository method를 새로 추가한다.
 `adapters/http`, `adapters/rpc`는 새 서버 adapter를 구현할 빈 디렉토리로 둔다.
 
 ### Request validation
@@ -124,17 +127,22 @@ program이 HTTP header를 직접 읽으면 안 된다.
 ### Audit log
 
 Todo mutation command는 성공 시 audit log를 남긴다.
+audit log는 Todo record와 같은 row에 섞어 저장하지 않고 별도 append-only 기록으로 저장한다.
+RDB를 사용한다면 별도의 `audit_logs` 테이블을 만든다.
 audit log의 내부 payload 형태는 자유롭게 정해도 된다.
 
-최소한 아래 정보를 표현할 수 있어야 한다.
+아래와 같은 정보를 표현할 수 있어야 한다.
 
 - `requestId`
-- actorId 또는 사용자 식별값이 있다면 포함
 - action: `CreateTodo`, `CompleteTodo`, `DeleteTodo`
 - target: Todo id 또는 식별 가능한 값
-- result: `Succeeded` 또는 `Rejected`
-- reason: 실패/거절 사유가 있다면 포함
+- result: 필수 범위에서는 `Succeeded`
+- reason: 실패/거절 로그까지 확장한다면 실패/거절 사유
 - occurredAt
+- (선택) actorId 또는 사용자 식별값이 있다면 포함
+
+`Rejected` audit log는 선택 확장이다.
+필수 범위는 successful mutation의 `Succeeded` audit log를 남기는 것이다.
 
 원한다면 domain event나 command event를 만들어 audit log payload로 사용해도 된다.
 다만 event modeling 자체는 필수 요구사항이 아니다.
@@ -150,8 +158,8 @@ PostgreSQL, MySQL 등을 사용해도 되지만 Docker, migration framework, ORM
 DB schema는 자유롭게 설계해도 된다.
 다만 Todo의 현재 상태와 audit log 기록을 저장할 수 있어야 한다.
 
-- Todo: id, title, status, created/completed/deleted 시각
-- Audit log: requestId, action, target, result, reason, occurredAt, 선택 actorId/payload
+- `todos`: id, title, status, created/completed/deleted 시각
+- `audit_logs`: requestId, action, target, result, reason, occurredAt, 선택 actorId/payload
 
 DB 관련 구현은 `src/layers` 아래에 자유롭게 배치한다.
 예를 들어 파일 수가 적으면 `sqlite-todo-repository.ts`처럼 flat하게 둘 수 있고, 많아지면 `layers/sqlite/` 같은 하위 디렉토리를 만들어도 된다.
@@ -275,10 +283,37 @@ heavy test framework 없이 작은 integration test나 수동 실행 로그 하�
 
 - `pnpm typecheck`로 TypeScript wiring을 확인한다.
 - `pnpm lint`로 layer dependency direction을 확인한다.
-- server를 실행하고 create/list/complete/delete 중 핵심 API가 동작하는지 확인한다.
+- `pnpm test`로 핵심 program과 transaction 보장을 확인한다.
+- server를 실행하고 create/list/complete/delete API가 실제로 호출되는지 확인한다.
 - requestId가 error response와 audit log에 남는지 확인한다.
 - validation failure가 표준 error response로 반환되는지 확인한다.
 - audit log insert 실패를 의도적으로 만들었을 때 Todo mutation이 commit되지 않는지 확인한다.
+
+HTTP를 선택했다면 `pnpm dev`로 서버를 띄운 뒤 아래 흐름을 `curl`로 재현한다.
+
+```bash
+curl -i -X POST http://localhost:3000/todos \
+  -H 'content-type: application/json' \
+  -H 'x-request-id: req-create-1' \
+  -d '{"title":"learn Effect server"}'
+
+curl -i http://localhost:3000/todos \
+  -H 'x-request-id: req-list-1'
+
+curl -i -X POST http://localhost:3000/todos/<todo-id>/complete \
+  -H 'x-request-id: req-complete-1'
+
+curl -i -X DELETE http://localhost:3000/todos/<todo-id> \
+  -H 'x-request-id: req-delete-1'
+```
+
+RPC를 선택했다면 같은 흐름을 실제 서버에 호출하는 client script나 integration test를 제공한다.
+
+audit log는 외부 API로 반드시 노출할 필요는 없다.
+대신 integration test, DB query script, 또는 README의 재현 절차로 아래를 확인할 수 있어야 한다.
+
+- 성공한 create/complete/delete mutation마다 `audit_logs`에 기록이 남는다.
+- audit log insert가 실패하도록 만든 경우 Todo 변경도 commit되지 않는다.
 
 ## 완료 기준
 
@@ -289,5 +324,6 @@ heavy test framework 없이 작은 integration test나 수동 실행 로그 하�
 - audit log 없는 successful mutation이 발생하지 않는다.
 - expected failure가 throw가 아니라 typed error로 보인다.
 - outbox, queue, fire-and-forget은 구현하지 않는다.
-- `tsc --noEmit`이 통과한다.
-- `eslint`가 통과한다.
+- `pnpm typecheck`가 통과한다.
+- `pnpm lint`가 통과한다.
+- `pnpm test`가 통과한다.
