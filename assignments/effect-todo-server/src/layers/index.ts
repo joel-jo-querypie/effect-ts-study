@@ -5,12 +5,14 @@ import { FileTodoImportSourceLive } from "./file-todo-import-source"
 import { InMemoryTodoEventStoreLive } from "./in-memory-todo-event-store"
 import { InMemoryTodoRepositoryLive } from "./in-memory-todo-repository"
 import { RandomTodoIdGeneratorLive } from "./id-generator"
+import { CliRequestContextLive, requestContextLayer } from "./request-context"
 
 export const FileAppLive = Layer.mergeAll(
   FileTodoRepositoryLive,
   FileTodoImportSourceLive,
   InMemoryTodoEventStoreLive,
   PassthroughAtomicRunnerLive,
+  CliRequestContextLive,
   RandomTodoIdGeneratorLive
 )
 
@@ -19,6 +21,7 @@ export const InMemoryAppLive = Layer.mergeAll(
   FileTodoImportSourceLive,
   InMemoryTodoEventStoreLive,
   PassthroughAtomicRunnerLive,
+  CliRequestContextLive,
   RandomTodoIdGeneratorLive
 )
 
@@ -27,5 +30,7 @@ export {
   InMemoryTodoEventStoreLive,
   InMemoryTodoRepositoryLive,
   PassthroughAtomicRunnerLive,
-  RandomTodoIdGeneratorLive
+  RandomTodoIdGeneratorLive,
+  CliRequestContextLive,
+  requestContextLayer
 }

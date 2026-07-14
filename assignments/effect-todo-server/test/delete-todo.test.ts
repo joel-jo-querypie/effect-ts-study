@@ -5,6 +5,7 @@ import {
   InMemoryTodoRepositoryLive,
   PassthroughAtomicRunnerLive,
   RandomTodoIdGeneratorLive,
+  requestContextLayer,
 } from "../src/layers";
 import { addTodo, deleteTodo, listTodos } from "../src/programs";
 
@@ -13,6 +14,7 @@ const TestLive = Layer.mergeAll(
   InMemoryTodoRepositoryLive,
   PassthroughAtomicRunnerLive,
   RandomTodoIdGeneratorLive,
+  requestContextLayer({ requestId: "test-request", actorId: "test-actor" }),
 );
 
 it.effect("soft-deleted todos are not returned by list", () =>
