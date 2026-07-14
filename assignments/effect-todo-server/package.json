@@ -16,8 +16,14 @@
   },
   "dependencies": {
     "@effect/cli": "catalog:",
+    "@effect/experimental": "catalog:",
     "@effect/platform": "catalog:",
     "@effect/platform-node": "catalog:",
+    "@effect/printer": "catalog:",
+    "@effect/printer-ansi": "catalog:",
+    "@effect/sql": "catalog:",
+    "@effect/sql-sqlite-node": "catalog:",
+    "@effect/typeclass": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
