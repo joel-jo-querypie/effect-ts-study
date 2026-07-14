@@ -1,5 +1,11 @@
 import { Effect, Layer, Ref } from "effect"
-import { toCompletedTodo, type Todo, type TodoList } from "../domain/todo"
+import {
+  toCompletedTodo,
+  toDeletedTodo,
+  type ListedTodo,
+  type Todo,
+  type TodoList
+} from "../domain/todo"
 import { TodoNotFound } from "../services/errors"
 import { TodoRepository } from "../services/todo-repository"
 
@@ -22,14 +28,14 @@ export const InMemoryTodoRepositoryLive = Layer.effect(
           return activeTodo
         }),
 
-      list: Ref.get(todos),
+      list: Ref.get(todos).pipe(Effect.map(filterListedTodos)),
 
       markDone: (id, completedAtMillis) =>
         Effect.gen(function* () {
           const currentTodos = yield* Ref.get(todos)
           const foundTodo = currentTodos.find((todo) => todo.id === id)
 
-          if (foundTodo === undefined) {
+          if (foundTodo === undefined || foundTodo._tag === "DeletedTodo") {
             return yield* Effect.fail(new TodoNotFound({ id }))
           }
 
@@ -45,7 +51,27 @@ export const InMemoryTodoRepositoryLive = Layer.effect(
           )
 
           return completedTodo
+        }),
+
+      delete: (id, deletedAtMillis) =>
+        Effect.gen(function* () {
+          const currentTodos = yield* Ref.get(todos)
+          const foundTodo = currentTodos.find((todo) => todo.id === id)
+
+          if (foundTodo === undefined || foundTodo._tag === "DeletedTodo") {
+            return yield* Effect.fail(new TodoNotFound({ id }))
+          }
+
+          const deletedTodo = toDeletedTodo(foundTodo, deletedAtMillis)
+          yield* replaceAll(
+            currentTodos.map((todo) => (todo.id === id ? deletedTodo : todo))
+          )
+
+          return deletedTodo
         })
     })
   })
 )
+
+const filterListedTodos = (todos: ReadonlyArray<Todo>): ReadonlyArray<ListedTodo> =>
+  todos.filter((todo): todo is ListedTodo => todo._tag !== "DeletedTodo")

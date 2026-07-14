@@ -1,5 +1,10 @@
 import { Context, Effect } from "effect";
-import type { ActiveTodo, CompletedTodo, Todo } from "../domain/todo";
+import type {
+  ActiveTodo,
+  CompletedTodo,
+  DeletedTodo,
+  ListedTodo,
+} from "../domain/todo";
 import type { TodoId } from "../domain/todo-id";
 import { StorageError, TodoNotFound } from "./errors";
 
@@ -7,7 +12,7 @@ export class TodoRepository extends Context.Tag("TodoRepository")<
   TodoRepository,
   {
     readonly add: (todo: ActiveTodo) => Effect.Effect<ActiveTodo, StorageError>;
-    readonly list: Effect.Effect<ReadonlyArray<Todo>, StorageError>;
+    readonly list: Effect.Effect<ReadonlyArray<ListedTodo>, StorageError>;
     readonly markDone: (
       id: TodoId,
       /**
@@ -16,5 +21,9 @@ export class TodoRepository extends Context.Tag("TodoRepository")<
        */
       completedAtMillis: number,
     ) => Effect.Effect<CompletedTodo, TodoNotFound | StorageError>;
+    readonly delete: (
+      id: TodoId,
+      deletedAtMillis: number,
+    ) => Effect.Effect<DeletedTodo, TodoNotFound | StorageError>;
   }
 >() {}

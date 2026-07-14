@@ -3,6 +3,8 @@ import { Effect, Layer, ParseResult, Schema } from "effect";
 import {
   TodoList,
   toCompletedTodo,
+  toDeletedTodo,
+  type ListedTodo,
   type Todo,
   type TodoList as TodoListType,
 } from "../domain/todo";
@@ -58,14 +60,14 @@ export const FileTodoRepositoryLive = Layer.effect(
           return activeTodo;
         }),
 
-      list: readAll,
+      list: readAll.pipe(Effect.map(filterListedTodos)),
 
       markDone: (id, completedAtMillis) =>
         Effect.gen(function* () {
           const currentTodos = yield* readAll;
           const foundTodo = currentTodos.find((todo) => todo.id === id);
 
-          if (foundTodo === undefined) {
+          if (foundTodo === undefined || foundTodo._tag === "DeletedTodo") {
             return yield* Effect.fail(new TodoNotFound({ id }));
           }
 
@@ -79,6 +81,23 @@ export const FileTodoRepositoryLive = Layer.effect(
           );
 
           return completedTodo;
+        }),
+
+      delete: (id, deletedAtMillis) =>
+        Effect.gen(function* () {
+          const currentTodos = yield* readAll;
+          const foundTodo = currentTodos.find((todo) => todo.id === id);
+
+          if (foundTodo === undefined || foundTodo._tag === "DeletedTodo") {
+            return yield* Effect.fail(new TodoNotFound({ id }));
+          }
+
+          const deletedTodo = toDeletedTodo(foundTodo, deletedAtMillis);
+          yield* writeAll(
+            currentTodos.map((todo) => (todo.id === id ? deletedTodo : todo)),
+          );
+
+          return deletedTodo;
         }),
     });
   }),
@@ -113,3 +132,6 @@ const parseTodoFileText = (
 const validateTodoFileData = (
   todos: ReadonlyArray<Todo>,
 ): Effect.Effect<TodoListType, StorageError> => decodeTodoFileData(todos);
+
+const filterListedTodos = (todos: ReadonlyArray<Todo>): ReadonlyArray<ListedTodo> =>
+  todos.filter((todo): todo is ListedTodo => todo._tag !== "DeletedTodo");
