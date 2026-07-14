@@ -1,7 +1,7 @@
 import { Effect, Layer, Ref } from "effect"
 import {
-  toCompletedTodo,
-  toDeletedTodo,
+  makeCompletedTodo,
+  makeDeletedTodo,
   type ListedTodo,
   type Todo,
   type TodoList
@@ -43,7 +43,7 @@ export const InMemoryTodoRepositoryLive = Layer.effect(
             return foundTodo
           }
 
-          const completedTodo = toCompletedTodo(foundTodo, completedAtMillis)
+          const completedTodo = makeCompletedTodo(foundTodo, completedAtMillis)
           yield* replaceAll(
             currentTodos.map((todo) =>
               todo.id === id ? completedTodo : todo
@@ -62,7 +62,7 @@ export const InMemoryTodoRepositoryLive = Layer.effect(
             return yield* Effect.fail(new TodoNotFound({ id }))
           }
 
-          const deletedTodo = toDeletedTodo(foundTodo, deletedAtMillis)
+          const deletedTodo = makeDeletedTodo(foundTodo, deletedAtMillis)
           yield* replaceAll(
             currentTodos.map((todo) => (todo.id === id ? deletedTodo : todo))
           )

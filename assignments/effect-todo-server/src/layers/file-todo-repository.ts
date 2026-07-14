@@ -2,8 +2,8 @@ import { FileSystem } from "@effect/platform";
 import { Effect, Layer, ParseResult, Schema } from "effect";
 import {
   TodoList,
-  toCompletedTodo,
-  toDeletedTodo,
+  makeCompletedTodo,
+  makeDeletedTodo,
   type ListedTodo,
   type Todo,
   type TodoList as TodoListType,
@@ -75,7 +75,7 @@ export const FileTodoRepositoryLive = Layer.effect(
             return foundTodo;
           }
 
-          const completedTodo = toCompletedTodo(foundTodo, completedAtMillis);
+          const completedTodo = makeCompletedTodo(foundTodo, completedAtMillis);
           yield* writeAll(
             currentTodos.map((todo) => (todo.id === id ? completedTodo : todo)),
           );
@@ -92,7 +92,7 @@ export const FileTodoRepositoryLive = Layer.effect(
             return yield* Effect.fail(new TodoNotFound({ id }));
           }
 
-          const deletedTodo = toDeletedTodo(foundTodo, deletedAtMillis);
+          const deletedTodo = makeDeletedTodo(foundTodo, deletedAtMillis);
           yield* writeAll(
             currentTodos.map((todo) => (todo.id === id ? deletedTodo : todo)),
           );
