@@ -1,4 +1,5 @@
 export { addTodo } from "./add-todo"
+export { deleteTodo } from "./delete-todo"
 export { doneTodo } from "./done-todo"
 export { importTodos } from "./import-todos"
 export { listTodos } from "./list-todos"
