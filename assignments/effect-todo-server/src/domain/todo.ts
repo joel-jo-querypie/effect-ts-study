@@ -55,7 +55,7 @@ export const makeActiveTodo = (input: {
   createdAtMillis: input.createdAtMillis,
 });
 
-export const toCompletedTodo = (
+export const makeCompletedTodo = (
   todo: CompletableTodo,
   completedAtMillis: number,
 ): CompletedTodo => ({
@@ -66,7 +66,7 @@ export const toCompletedTodo = (
   completedAtMillis,
 });
 
-export const toDeletedTodo = (
+export const makeDeletedTodo = (
   todo: DeletableTodo,
   deletedAtMillis: number,
 ): DeletedTodo => ({
@@ -77,7 +77,7 @@ export const toDeletedTodo = (
   deletedAtMillis,
 });
 
-export const toBlockedTodo = (input: {
+export const makeBlockedTodo = (input: {
   readonly todo: ActiveTodo;
   readonly blockedReason: string;
   readonly blockedAtMillis: number;
@@ -90,7 +90,7 @@ export const toBlockedTodo = (input: {
   blockedAtMillis: input.blockedAtMillis,
 });
 
-export const toActiveTodo = (todo: BlockedTodo): ActiveTodo => ({
+export const makeActiveFromBlockedTodo = (todo: BlockedTodo): ActiveTodo => ({
   _tag: "ActiveTodo",
   id: todo.id,
   title: todo.title,
