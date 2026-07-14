@@ -24,9 +24,22 @@ export const CompletedTodo = Schema.TaggedStruct("CompletedTodo", {
 });
 export type CompletedTodo = Schema.Schema.Type<typeof CompletedTodo>;
 
-export const Todo = Schema.Union(ActiveTodo, BlockedTodo, CompletedTodo);
+export const DeletedTodo = Schema.TaggedStruct("DeletedTodo", {
+  ...TodoFields,
+  deletedAtMillis: Schema.Number,
+});
+export type DeletedTodo = Schema.Schema.Type<typeof DeletedTodo>;
+
+export const Todo = Schema.Union(
+  ActiveTodo,
+  BlockedTodo,
+  CompletedTodo,
+  DeletedTodo,
+);
 export type Todo = Schema.Schema.Type<typeof Todo>;
 export type CompletableTodo = ActiveTodo | BlockedTodo;
+export type DeletableTodo = ActiveTodo | BlockedTodo | CompletedTodo;
+export type ListedTodo = DeletableTodo;
 
 export const TodoList = Schema.Array(Todo);
 export type TodoList = Schema.Schema.Type<typeof TodoList>;
@@ -51,6 +64,17 @@ export const toCompletedTodo = (
   title: todo.title,
   createdAtMillis: todo.createdAtMillis,
   completedAtMillis,
+});
+
+export const toDeletedTodo = (
+  todo: DeletableTodo,
+  deletedAtMillis: number,
+): DeletedTodo => ({
+  _tag: "DeletedTodo",
+  id: todo.id,
+  title: todo.title,
+  createdAtMillis: todo.createdAtMillis,
+  deletedAtMillis,
 });
 
 export const toBlockedTodo = (input: {
