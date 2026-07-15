@@ -1,5 +1,5 @@
 import { HttpServerResponse } from "@effect/platform";
-import { ParseResult } from "effect";
+import { Data, Match } from "effect";
 import { InvalidTodoId, InvalidTodoTitle } from "../../domain/error";
 import { StorageError, TodoNotFound } from "../../services/errors";
 
@@ -11,81 +11,62 @@ export type ErrorResponseDto = {
   };
 };
 
-/** domain error와 errorResponseDto의 중간 역할
- * status는 JSON body의 데이터가 아니라 HTTP response 자체의 메타데이터
- * header의 상태는 404인데 body의 status가 실수로 500인 불일치 생길 수 있음
-*/
+/**
+ * The HTTP adapter owns this error. Parser failures from @effect/platform and
+ * Schema are normalized here instead of leaking into the public error model.
+ */
+export class InvalidHttpRequest extends Data.TaggedError("InvalidHttpRequest") {}
+
+/**
+ * Every expected failure this adapter is allowed to render. A new member makes
+ * Match.tagsExhaustive fail to type-check until its HTTP representation exists.
+ */
+export type ExpectedHttpError =
+  | InvalidHttpRequest
+  | InvalidTodoTitle
+  | InvalidTodoId
+  | TodoNotFound
+  | StorageError;
+
 type ErrorMapping = {
   readonly status: number;
   readonly code: string;
   readonly message: string;
 };
 
-const hasTag = (error: unknown): error is { readonly _tag: string } =>
-  typeof error === "object" &&
-  error !== null &&
-  "_tag" in error &&
-  typeof error._tag === "string";
-
-const errorMapping = (error: unknown): ErrorMapping => {
-  if (error instanceof InvalidTodoTitle) {
-    return {
-      status: 400,
-      code: "INVALID_TODO_TITLE",
-      message: "Todo title is invalid.",
-    };
-  }
-
-  if (error instanceof InvalidTodoId) {
-    return {
-      status: 400,
-      code: "INVALID_TODO_ID",
-      message: "Todo id is invalid.",
-    };
-  }
-
-  if (error instanceof TodoNotFound) {
-    return {
-      status: 404,
-      code: "TODO_NOT_FOUND",
-      message: "Todo was not found.",
-    };
-  }
-
-  if (error instanceof StorageError) {
-    return {
-      status: 500,
-      code: "STORAGE_ERROR",
-      message: "Todo storage failed.",
-    };
-  }
-
-  if (ParseResult.isParseError(error)) {
-    return {
-      status: 400,
-      code: "INVALID_HTTP_REQUEST",
-      message: "HTTP request shape is invalid.",
-    };
-  }
-
-  if (hasTag(error) && error._tag === "RequestError") {
-    return {
+const errorMapping = Match.type<ExpectedHttpError>().pipe(
+  Match.tagsExhaustive({
+    InvalidHttpRequest: (): ErrorMapping => ({
       status: 400,
       code: "INVALID_HTTP_REQUEST",
       message: "HTTP request could not be decoded.",
-    };
-  }
-
-  return {
-    status: 500,
-    code: "INTERNAL_SERVER_ERROR",
-    message: "Unexpected server error.",
-  };
-};
+    }),
+    InvalidTodoTitle: (): ErrorMapping => ({
+      status: 400,
+      code: "INVALID_TODO_TITLE",
+      message: "Todo title is invalid.",
+    }),
+    InvalidTodoId: (): ErrorMapping => ({
+      status: 400,
+      code: "INVALID_TODO_ID",
+      message: "Todo id is invalid.",
+    }),
+    TodoNotFound: (): ErrorMapping => ({
+      status: 404,
+      code: "TODO_NOT_FOUND",
+      message: "Todo was not found.",
+    }),
+    StorageError: (): ErrorMapping => ({
+      status: 500,
+      code: "STORAGE_ERROR",
+      message: "Todo storage failed.",
+    }),
+  }),
+);
 
 export const toErrorResponse = (
   requestId: string,
-  error: unknown,
+  error: ExpectedHttpError,
 ): HttpServerResponse.HttpServerResponse => {
   const mapped = errorMapping(error);
   return HttpServerResponse.unsafeJson(
