@@ -1,15 +1,28 @@
 import type { SqlError } from "@effect/sql/SqlError";
-import { StorageError } from "../../services/errors";
+import {
+  AtomicRunnerFailure,
+  StorageError,
+} from "../../services/errors";
 
-export const toStorageError = (operation: string) => (cause: unknown) =>
-  new StorageError({
+const errorMessage = (cause: unknown): string =>
+  cause instanceof Error
+    ? cause.message
+    : typeof cause === "object" && cause !== null && "message" in cause
+      ? String(cause.message)
+      : String(cause);
+
+export const toStorageError =
+  (operation: string) =>
+  (cause: unknown): StorageError =>
+    new StorageError({
+      operation,
+      message: errorMessage(cause),
+    });
+
+export const toAtomicRunnerFailure = (operation: string) => (cause: unknown) =>
+  new AtomicRunnerFailure({
     operation,
-    message:
-      cause instanceof Error
-        ? cause.message
-        : typeof cause === "object" && cause !== null && "message" in cause
-          ? String(cause.message)
-          : String(cause),
+    message: errorMessage(cause),
   });
 
 export const isSqlError = (cause: unknown): cause is SqlError =>

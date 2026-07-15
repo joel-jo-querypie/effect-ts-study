@@ -48,6 +48,7 @@ export const ListTodosRequestDto = Schema.Struct({
 });
 export type ListTodosRequestDto = Schema.Schema.Type<typeof ListTodosRequestDto>;
 
+// TODO: parse, dont't validate
 export const requestContextFromHeaders = (
   headers: Readonly<Record<string, string | undefined>>,
 ): Effect.Effect<RequestContextData> =>

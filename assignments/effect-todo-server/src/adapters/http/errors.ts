@@ -5,7 +5,13 @@ import {
   InvalidTodoTitle,
   TodoAlreadyCompleted,
 } from "../../domain/error";
-import { StorageError, TodoNotFound } from "../../services/errors";
+import {
+  AtomicRunnerFailure,
+  PersistenceInvariantViolation,
+  RetryableStorageError,
+  StorageError,
+  TodoNotFound,
+} from "../../services/errors";
 
 export type ErrorResponseDto = {
   readonly error: {
@@ -15,23 +21,18 @@ export type ErrorResponseDto = {
   };
 };
 
-/**
- * The HTTP adapter owns this error. Parser failures from @effect/platform and
- * Schema are normalized here instead of leaking into the public error model.
- */
 export class InvalidHttpRequest extends Data.TaggedError("InvalidHttpRequest") {}
 
-/**
- * Every expected failure this adapter is allowed to render. A new member makes
- * Match.tagsExhaustive fail to type-check until its HTTP representation exists.
- */
 export type ExpectedHttpError =
   | InvalidHttpRequest
   | InvalidTodoTitle
   | InvalidTodoId
   | TodoAlreadyCompleted
   | TodoNotFound
-  | StorageError;
+  | StorageError
+  | RetryableStorageError
+  | PersistenceInvariantViolation
+  | AtomicRunnerFailure;
 
 type ErrorMapping = {
   readonly status: number;
@@ -39,6 +40,22 @@ type ErrorMapping = {
   readonly message: string;
 };
 
+/**
+ * 1. 이 에러는 HTTP에서 어떤 의미인가? -> errorMapping. 만일 INVALID_TODO_ID
+   2. 그 의미를 어떤 HTTP 응답 형식으로 보낼 것인가? -> dto
+
+   -TodoNotFound를 404 대신 410으로 바꾼다
+   → ErrorMapping만 변경
+
+   - 오류 응답에 traceId를 추가한다
+   → DTO 조립 부분만 변경
+
+   -RetryableStorageError에 Retry-After header를 붙인다
+   → mapping에 retry metadata를 추가하거나 response 조립을 확장
+
+   - StorageError.message에 SQL 상세가 있어도 외부에 노출하지 않는다
+   → mapping에서 public message를 고정
+ */
 const errorMapping = Match.type<ExpectedHttpError>().pipe(
   Match.tagsExhaustive({
     InvalidHttpRequest: (): ErrorMapping => ({
@@ -70,6 +87,21 @@ const errorMapping = Match.type<ExpectedHttpError>().pipe(
       status: 500,
       code: "STORAGE_ERROR",
       message: "Todo storage failed.",
+    }),
+    RetryableStorageError: (): ErrorMapping => ({
+      status: 503,
+      code: "STORAGE_TEMPORARILY_UNAVAILABLE",
+      message: "Todo storage is temporarily unavailable. Please retry.",
+    }),
+    PersistenceInvariantViolation: (): ErrorMapping => ({
+      status: 500,
+      code: "PERSISTENCE_INVARIANT_VIOLATION",
+      message: "Stored Todo data is invalid.",
+    }),
+    AtomicRunnerFailure: (): ErrorMapping => ({
+      status: 500,
+      code: "ATOMIC_OPERATION_FAILED",
+      message: "Todo change could not be completed atomically.",
     }),
   }),
 );

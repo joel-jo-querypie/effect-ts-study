@@ -95,6 +95,6 @@ export const SqliteSchemaLive = Layer.effectDiscard(
         `;
         yield* sql`PRAGMA user_version = 1`;
       }),
-    ).pipe(Effect.mapError(toStorageError("migrate SQLite schema")));
+    ).pipe(Effect.mapError(toStorageError("migrate SQLite schema"))); // transaction으로 묶고 storage error로 
   }),
 );
