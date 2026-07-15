@@ -6,6 +6,7 @@
   "scripts": {
     "copy:cli-core": "bash scripts/copy-cli-core.sh",
     "dev": "tsx src/main.ts",
+    "e2e:http": "bash scripts/e2e-http.sh",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src test",
     "test": "vitest run"

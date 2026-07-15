@@ -1,5 +1,4 @@
-import { Console, Effect } from "effect"
+import { Effect, Layer } from "effect";
+import { TodoServerLive } from "./server/live";
 
-const main = Console.log("effect-todo-server scaffold")
-
-void Effect.runPromise(main)
+void Effect.runPromise(Layer.launch(TodoServerLive));

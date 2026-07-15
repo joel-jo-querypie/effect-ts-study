@@ -141,3 +141,24 @@ RPC를 선택했다면 같은 흐름을 실제 서버에 호출하는 client scr
 
 audit log는 별도 조회 API로 노출하지 않아도 된다.
 대신 test, DB query script, 또는 README 재현 절차로 successful mutation의 Todo 변경과 `audit_logs` insert가 같은 transaction 안에서 함께 성공/실패함을 보여준다.
+
+## 테스트
+
+자동 테스트는 HTTP server, SQLite, audit log까지 포함한다.
+
+```bash
+pnpm test
+```
+
+실제 프로세스를 띄운 뒤 `curl`로 Todo lifecycle과 malformed JSON 오류 응답을 검증하려면 다음을 실행한다.
+테스트는 임시 SQLite DB와 기본 `3010` port를 사용하고, 종료 시 정리한다.
+
+```bash
+pnpm e2e:http
+```
+
+이미 `3010` port를 사용 중이면 다른 port를 지정할 수 있다.
+
+```bash
+TODO_E2E_PORT=3011 pnpm e2e:http
+```

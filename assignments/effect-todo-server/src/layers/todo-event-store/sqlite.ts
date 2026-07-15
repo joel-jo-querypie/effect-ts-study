@@ -32,7 +32,7 @@ export const SqliteTodoEventStoreLive = Layer.effect(
               result,
               reason,
               occurred_at_millis,
-              payload_json,
+              payload_json
             ) VALUES (
               ${requestContext.requestId},
               ${requestContext.actorId ?? null},
