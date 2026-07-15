@@ -1,4 +1,5 @@
-import { Effect, Layer } from "effect";
+import { NodeRuntime } from "@effect/platform-node";
+import { Layer } from "effect";
 import { TodoServerLive } from "./server/live";
 
-void Effect.runPromise(Layer.launch(TodoServerLive));
+NodeRuntime.runMain(Layer.launch(TodoServerLive));

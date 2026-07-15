@@ -6,13 +6,15 @@ import { listTodos } from "../../programs";
 export const listCommand = Command.make("list", {}, () =>
   // Console.log를 Output service로 말아?
   // readonly printLine: (line: string) => Effet.Effect<void>}
-  listTodos.pipe(Effect.map(renderTodoList), Effect.flatMap(Console.log)),
+  listTodos().pipe(
+    Effect.map((page) => renderTodoList(page.items)),
+    Effect.flatMap(Console.log),
+  ),
 );
 
 const renderTodoStatus = Match.type<ListedTodo>().pipe(
   Match.tagsExhaustive({
     ActiveTodo: () => "[ ]",
-    BlockedTodo: () => "[!blocked]",
     CompletedTodo: () => "[x]",
   }),
 );
@@ -21,8 +23,6 @@ const renderTodo = Match.type<ListedTodo>().pipe(
   Match.tagsExhaustive({
     ActiveTodo: (todo) =>
       `${renderTodoStatus(todo)} ${todo.id} ${todo.title} created at ${todo.createdAtMillis}(ms)`,
-    BlockedTodo: (todo) =>
-      `${renderTodoStatus(todo)} ${todo.id} ${todo.title} blocked at ${todo.blockedAtMillis}(ms) because ${todo.blockedReason}`,
     CompletedTodo: (todo) =>
       `${renderTodoStatus(todo)} ${todo.id} ${todo.title} completed at ${todo.completedAtMillis}(ms)`,
   }),

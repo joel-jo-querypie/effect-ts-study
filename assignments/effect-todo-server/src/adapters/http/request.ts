@@ -1,10 +1,14 @@
-import { Clock, Effect, Random, Schema } from "effect";
-import type { RequestContextData } from "../../services/request-context";
+import { Effect, Schema } from "effect";
+import {
+  ActorId,
+  RequestId,
+  type RequestContextData,
+} from "../../services/request-context";
 
 // 클라이언트가 보내지 않아도 요청을 처리할 수 있는 정책으로 optional
 export const HttpHeadersDto = Schema.Struct({
-  "x-request-id": Schema.optional(Schema.String),
-  "x-actor-id": Schema.optional(Schema.String),
+  "x-request-id": Schema.optional(RequestId),
+  "x-actor-id": Schema.optional(ActorId),
 });
 export type HttpHeadersDto = Schema.Schema.Type<typeof HttpHeadersDto>;
 
@@ -30,27 +34,37 @@ export type TodoIdPathRequestDto = Schema.Schema.Type<
   typeof TodoIdPathRequestDto
 >;
 
-// ListTodosRequestDto
+// ListTodosRequestDto TODO: limit, offset 고민해보기.
 export const ListTodosRequestDto = Schema.Struct({
   headers: HttpHeadersDto,
+  searchParams: Schema.Struct({
+    limit: Schema.optional(
+      Schema.NumberFromString.pipe(Schema.int(), Schema.between(1, 100)),
+    ),
+    offset: Schema.optional(
+      Schema.NumberFromString.pipe(Schema.int(), Schema.nonNegative()),
+    ),
+  }),
 });
 export type ListTodosRequestDto = Schema.Schema.Type<typeof ListTodosRequestDto>;
 
 export const requestContextFromHeaders = (
-  headers: HttpHeadersDto,
+  headers: Readonly<Record<string, string | undefined>>,
 ): Effect.Effect<RequestContextData> =>
-  Effect.gen(function* () {
-    if (headers["x-request-id"] !== undefined) {
-      return {
-        requestId: headers["x-request-id"],
-        actorId: headers?.["x-actor-id"],
-      };
-    }
+  Effect.sync(() => {
+    const rawRequestId = headers["x-request-id"];
+    const rawActorId = headers["x-actor-id"];
+    const requestId =
+      rawRequestId !== undefined && rawRequestId.length > 0 && rawRequestId.length <= 128
+        ? RequestId.make(rawRequestId)
+        : RequestId.make(globalThis.crypto.randomUUID());
+    const actorId =
+      rawActorId !== undefined && rawActorId.length > 0 && rawActorId.length <= 128
+        ? ActorId.make(rawActorId)
+        : undefined;
 
-    const now = yield* Clock.currentTimeMillis;
-    const suffix = yield* Random.nextIntBetween(100_000, 999_999);
     return {
-      requestId: `req-${now}-${suffix}`,
-      actorId: headers["x-actor-id"],
-    };
+      requestId,
+      ...(actorId === undefined ? {} : { actorId }),
+    }
   });

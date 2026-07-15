@@ -22,6 +22,11 @@ type TodoResponse = {
   readonly status: "active" | "completed" | "deleted";
 };
 
+type TodoPageResponse = {
+  readonly items: ReadonlyArray<TodoResponse>;
+  readonly nextOffset?: number;
+};
+
 type ErrorResponse = {
   readonly error: {
     readonly code: string;
@@ -79,6 +84,20 @@ it.effect("serves the Todo lifecycle and standard decode errors", () => {
       expect(completeResponse.status).toBe(200);
       expect(completed.status).toBe("completed");
 
+      const repeatedCompleteResponse = yield* HttpClient.execute(
+        HttpClientRequest.post(`/todos/${created.id}/complete`).pipe(
+          HttpClientRequest.setHeader(
+            "x-request-id",
+            "http-e2e-complete-again",
+          ),
+        ),
+      );
+      const repeatedComplete =
+        (yield* repeatedCompleteResponse.json) as ErrorResponse;
+
+      expect(repeatedCompleteResponse.status).toBe(409);
+      expect(repeatedComplete.error.code).toBe("TODO_ALREADY_COMPLETED");
+
       const deleteResponse = yield* HttpClient.execute(
         HttpClientRequest.del(`/todos/${created.id}`).pipe(
           HttpClientRequest.setHeader("x-request-id", "http-e2e-delete"),
@@ -90,10 +109,10 @@ it.effect("serves the Todo lifecycle and standard decode errors", () => {
       expect(deleted.status).toBe("deleted");
 
       const listResponse = yield* HttpClient.get("/todos");
-      const listed = (yield* listResponse.json) as ReadonlyArray<TodoResponse>;
+      const listed = (yield* listResponse.json) as TodoPageResponse;
 
       expect(listResponse.status).toBe(200);
-      expect(listed).toEqual([]);
+      expect(listed).toEqual({ items: [] });
 
       const malformedResponse = yield* HttpClient.execute(
         HttpClientRequest.post("/todos").pipe(

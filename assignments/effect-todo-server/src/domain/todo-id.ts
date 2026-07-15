@@ -1,8 +1,7 @@
 import { Effect, Schema } from "effect";
 import { InvalidTodoId } from "./error";
 
-export const TodoId = Schema.String.pipe(
-  Schema.minLength(1),
+export const TodoId = Schema.UUID.pipe(
   Schema.brand("TodoId"),
 );
 export type TodoId = Schema.Schema.Type<typeof TodoId>;

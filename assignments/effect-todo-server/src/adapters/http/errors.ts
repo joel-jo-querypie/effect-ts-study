@@ -1,6 +1,10 @@
 import { HttpServerResponse } from "@effect/platform";
 import { Data, Match } from "effect";
-import { InvalidTodoId, InvalidTodoTitle } from "../../domain/error";
+import {
+  InvalidTodoId,
+  InvalidTodoTitle,
+  TodoAlreadyCompleted,
+} from "../../domain/error";
 import { StorageError, TodoNotFound } from "../../services/errors";
 
 export type ErrorResponseDto = {
@@ -25,6 +29,7 @@ export type ExpectedHttpError =
   | InvalidHttpRequest
   | InvalidTodoTitle
   | InvalidTodoId
+  | TodoAlreadyCompleted
   | TodoNotFound
   | StorageError;
 
@@ -50,6 +55,11 @@ const errorMapping = Match.type<ExpectedHttpError>().pipe(
       status: 400,
       code: "INVALID_TODO_ID",
       message: "Todo id is invalid.",
+    }),
+    TodoAlreadyCompleted: (): ErrorMapping => ({
+      status: 409,
+      code: "TODO_ALREADY_COMPLETED",
+      message: "Todo is already completed.",
     }),
     TodoNotFound: (): ErrorMapping => ({
       status: 404,

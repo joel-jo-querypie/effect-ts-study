@@ -14,6 +14,7 @@ import {
   SqliteTodoRepositoryLive,
 } from "../src/layers";
 import { addTodo } from "../src/programs";
+import { listTodos } from "../src/programs";
 import { StorageError } from "../src/services/errors";
 import { TodoEventStore } from "../src/services/todo-event-store";
 
@@ -112,6 +113,51 @@ it.effect("rolls back todo changes when audit append fails", () => {
 
     expect(result._tag).toBe("Left");
     expect(todos).toEqual([{ count: 0 }]);
+  }).pipe(
+    Effect.provide(TestLive),
+    Effect.ensuring(Effect.sync(() => rmSync(dbFile, { force: true }))),
+  );
+});
+
+it.effect("rejects a persisted row that violates the Todo state invariant", () => {
+  const dbFile = makeDbFile();
+  const SqliteLive = Layer.provideMerge(
+    sqlitePersistenceLayer,
+    sqliteClientLayer(dbFile),
+  );
+  const TestLive = Layer.mergeAll(
+    SqliteLive,
+    RandomTodoIdGeneratorLive,
+    requestContextLayer({ requestId: "req-corrupt-row" }),
+  );
+
+  return Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`PRAGMA ignore_check_constraints = ON`;
+    yield* sql`
+      INSERT INTO todos (
+        id,
+        title,
+        status,
+        created_at_millis,
+        completed_at_millis,
+        deleted_at_millis
+      ) VALUES (
+        '00000000-0000-4000-8000-000000000001',
+        'corrupt completed todo',
+        'completed',
+        1,
+        NULL,
+        NULL
+      )
+    `;
+
+    const result = yield* Effect.either(listTodos());
+
+    expect(result._tag).toBe("Left");
+    if (result._tag === "Left") {
+      expect(result.left._tag).toBe("StorageError");
+    }
   }).pipe(
     Effect.provide(TestLive),
     Effect.ensuring(Effect.sync(() => rmSync(dbFile, { force: true }))),

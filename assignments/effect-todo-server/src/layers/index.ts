@@ -9,7 +9,6 @@ import {
   sqlitePersistenceLayerForFile,
   SqliteSchemaLive
 } from "./sqlite"
-import { FileTodoImportSourceLive } from "./todo-import-source/file"
 import { InMemoryTodoEventStoreLive } from "./todo-event-store/memory"
 import { SqliteTodoEventStoreLive } from "./todo-event-store/sqlite"
 import { FileTodoRepositoryLive } from "./todo-repository/file"
@@ -18,7 +17,6 @@ import { SqliteTodoRepositoryLive } from "./todo-repository/sqlite"
 
 export const FileAppLive = Layer.mergeAll(
   FileTodoRepositoryLive,
-  FileTodoImportSourceLive,
   InMemoryTodoEventStoreLive,
   PassthroughAtomicRunnerLive,
   CliRequestContextLive,
@@ -27,7 +25,6 @@ export const FileAppLive = Layer.mergeAll(
 
 export const InMemoryAppLive = Layer.mergeAll(
   InMemoryTodoRepositoryLive,
-  FileTodoImportSourceLive,
   InMemoryTodoEventStoreLive,
   PassthroughAtomicRunnerLive,
   CliRequestContextLive,

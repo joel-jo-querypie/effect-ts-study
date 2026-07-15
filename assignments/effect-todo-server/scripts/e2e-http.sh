@@ -49,7 +49,7 @@ process.stdout.write(todo.id);
 listed="$(curl --silent --show-error --fail-with-body "http://127.0.0.1:$port/todos" -H 'x-request-id: e2e-list-1')"
 node -e '
 const todos = JSON.parse(process.argv[1]);
-if (!Array.isArray(todos) || todos.length !== 1 || todos[0].id !== process.argv[2]) process.exit(1);
+if (!Array.isArray(todos.items) || todos.items.length !== 1 || todos.items[0].id !== process.argv[2]) process.exit(1);
 ' "$listed" "$todo_id"
 
 completed="$(curl --silent --show-error --fail-with-body -X POST "http://127.0.0.1:$port/todos/$todo_id/complete" \
@@ -58,6 +58,20 @@ node -e '
 const todo = JSON.parse(process.argv[1]);
 if (todo.id !== process.argv[2] || todo.status !== "completed") process.exit(1);
 ' "$completed" "$todo_id"
+
+repeated_complete_body="$temp_dir/repeated-complete.json"
+repeated_complete_status="$(curl --silent --show-error -o "$repeated_complete_body" -w '%{http_code}' -X POST "http://127.0.0.1:$port/todos/$todo_id/complete" \
+  -H 'x-request-id: e2e-complete-again-1')"
+
+if [[ "$repeated_complete_status" != "409" ]]; then
+  cat "$repeated_complete_body"
+  exit 1
+fi
+
+node -e '
+const response = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+if (response.error?.code !== "TODO_ALREADY_COMPLETED") process.exit(1);
+' "$repeated_complete_body"
 
 deleted="$(curl --silent --show-error --fail-with-body -X DELETE "http://127.0.0.1:$port/todos/$todo_id" \
   -H 'x-request-id: e2e-delete-1')"
@@ -69,7 +83,7 @@ if (todo.id !== process.argv[2] || todo.status !== "deleted") process.exit(1);
 listed_after_delete="$(curl --silent --show-error --fail-with-body "http://127.0.0.1:$port/todos" -H 'x-request-id: e2e-list-2')"
 node -e '
 const todos = JSON.parse(process.argv[1]);
-if (!Array.isArray(todos) || todos.length !== 0) process.exit(1);
+if (!Array.isArray(todos.items) || todos.items.length !== 0) process.exit(1);
 ' "$listed_after_delete"
 
 malformed_body_file="$temp_dir/malformed-body.json"
@@ -88,4 +102,4 @@ const response = JSON.parse(require("node:fs").readFileSync(process.argv[1], "ut
 if (response.error?.code !== "INVALID_HTTP_REQUEST" || response.error?.requestId !== "e2e-malformed-1") process.exit(1);
 ' "$malformed_body_file"
 
-echo "HTTP e2e passed: create -> list -> complete -> delete -> list, plus malformed JSON."
+echo "HTTP e2e passed: create -> list -> complete -> repeated complete -> delete -> list, plus malformed JSON."

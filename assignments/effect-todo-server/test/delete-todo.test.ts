@@ -21,10 +21,10 @@ it.effect("soft-deleted todos are not returned by list", () =>
   Effect.gen(function* () {
     const added = yield* addTodo("learn atomic events");
     const deleted = yield* deleteTodo(added.id);
-    const listed = yield* listTodos;
+    const listed = yield* listTodos();
 
     expect(deleted._tag).toBe("DeletedTodo");
     expect(deleted.id).toBe(added.id);
-    expect(listed).toHaveLength(0);
+    expect(listed.items).toHaveLength(0);
   }).pipe(Effect.provide(TestLive)),
 );

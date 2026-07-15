@@ -7,7 +7,7 @@ export const doneTodo = (idInput: string) =>
     const id = yield* todoIdFromString(idInput);
     const repository = yield* TodoRepository;
     const completedAtMillis = yield* Clock.currentTimeMillis;
-    const completedTodo = yield* repository.markDone(id, completedAtMillis);
+    const completedTodo = yield* repository.markDone(id, completedAtMillis)
 
     return completedTodo;
   });

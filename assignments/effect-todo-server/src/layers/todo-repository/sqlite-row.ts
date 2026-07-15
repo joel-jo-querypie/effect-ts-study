@@ -1,112 +1,115 @@
 import { Effect, ParseResult, Schema } from "effect";
-import {
-  CompletedTodo,
-  DeletedTodo,
-  Todo,
-  type ListedTodo,
-} from "../../domain/todo";
+import { epochMillisFromNumber } from "../../domain/epoch-millis";
+import { Todo, type ListedTodo } from "../../domain/todo";
 import { StorageError } from "../../services/errors";
 
-export type TodoRow = {
-  readonly id: string;
-  readonly title: string;
-  readonly status: "active" | "blocked" | "completed" | "deleted";
-  readonly created_at_millis: number;
-  readonly blocked_reason: string | null;
-  readonly blocked_at_millis: number | null;
-  readonly completed_at_millis: number | null;
-  readonly deleted_at_millis: number | null;
-};
+const PersistedMillis = Schema.Number.pipe(Schema.int(), Schema.nonNegative());
 
-const decodeTodo = (operation: string, input: unknown) =>
-  Schema.decodeUnknown(Todo)(input).pipe(
-    Effect.mapError((error) =>
-      new StorageError({
-        operation,
-        message: ParseResult.TreeFormatter.formatErrorSync(error),
-      }),
-    ),
+const ActiveTodoRow = Schema.Struct({
+  id: Schema.UUID,
+  title: Schema.String,
+  status: Schema.Literal("active"),
+  created_at_millis: PersistedMillis,
+  completed_at_millis: Schema.Null,
+  deleted_at_millis: Schema.Null,
+});
+
+const CompletedTodoRow = Schema.Struct({
+  id: Schema.UUID,
+  title: Schema.String,
+  status: Schema.Literal("completed"),
+  created_at_millis: PersistedMillis,
+  completed_at_millis: PersistedMillis,
+  deleted_at_millis: Schema.Null,
+});
+
+const DeletedTodoRow = Schema.Struct({
+  id: Schema.UUID,
+  title: Schema.String,
+  status: Schema.Literal("deleted"),
+  created_at_millis: PersistedMillis,
+  completed_at_millis: Schema.NullOr(PersistedMillis),
+  deleted_at_millis: PersistedMillis,
+});
+
+const TodoRowSchema = Schema.Union(
+  ActiveTodoRow,
+  CompletedTodoRow,
+  DeletedTodoRow,
+);
+const toStorageError = (operation: string) => (error: unknown) =>
+  new StorageError({
+    operation,
+    message:
+      error instanceof Error
+        ? error.message
+        : ParseResult.TreeFormatter.formatErrorSync(error as ParseResult.ParseError),
+  });
+
+const decodeTodoRow = (operation: string, input: unknown) =>
+  Schema.decodeUnknown(TodoRowSchema)(input).pipe(
+    Effect.mapError(toStorageError(operation)),
   );
 
-const decodeCompletedTodo = (operation: string, input: unknown) =>
-  Schema.decodeUnknown(CompletedTodo)(input).pipe(
-    Effect.mapError((error) =>
-      new StorageError({
-        operation,
-        message: ParseResult.TreeFormatter.formatErrorSync(error),
-      }),
-    ),
+export const todoFromRow = (input: unknown): Effect.Effect<Todo, StorageError> =>
+  decodeTodoRow("decode todo row", input).pipe(
+    Effect.flatMap((row) => {
+      const todo = (() => {
+      switch (row.status) {
+        case "active":
+          return {
+            _tag: "ActiveTodo",
+            id: row.id,
+            title: row.title,
+            createdAtMillis: epochMillisFromNumber(row.created_at_millis),
+          };
+        case "completed":
+          return {
+            _tag: "CompletedTodo",
+            id: row.id,
+            title: row.title,
+            createdAtMillis: epochMillisFromNumber(row.created_at_millis),
+            completedAtMillis: epochMillisFromNumber(row.completed_at_millis),
+          };
+        case "deleted":
+          return {
+            _tag: "DeletedTodo",
+            id: row.id,
+            title: row.title,
+            createdAtMillis: epochMillisFromNumber(row.created_at_millis),
+            deletedAtMillis: epochMillisFromNumber(row.deleted_at_millis),
+          };
+      }
+      })();
+
+      return Schema.decodeUnknown(Todo)(todo).pipe(
+        Effect.mapError(toStorageError("decode Todo domain value")),
+      );
+    }),
   );
 
-const decodeDeletedTodo = (operation: string, input: unknown) =>
-  Schema.decodeUnknown(DeletedTodo)(input).pipe(
-    Effect.mapError((error) =>
-      new StorageError({
-        operation,
-        message: ParseResult.TreeFormatter.formatErrorSync(error),
-      }),
-    ),
-  );
+const requireTag = <A extends Todo["_tag"]>(tag: A, operation: string) =>
+  (todo: Todo): Effect.Effect<Extract<Todo, { readonly _tag: A }>, StorageError> =>
+    todo._tag === tag
+      ? Effect.succeed(todo as Extract<Todo, { readonly _tag: A }>)
+      : Effect.fail(
+          new StorageError({
+            operation,
+            message: `Expected ${tag} row, received ${todo._tag}.`,
+          }),
+        );
 
-export const todoFromRow = (row: TodoRow) => {
-  switch (row.status) {
-    case "active":
-      return decodeTodo("decode active todo row", {
-        _tag: "ActiveTodo",
-        id: row.id,
-        title: row.title,
-        createdAtMillis: row.created_at_millis,
-      });
-    case "blocked":
-      return decodeTodo("decode blocked todo row", {
-        _tag: "BlockedTodo",
-        id: row.id,
-        title: row.title,
-        createdAtMillis: row.created_at_millis,
-        blockedReason: row.blocked_reason ?? "",
-        blockedAtMillis: row.blocked_at_millis ?? 0,
-      });
-    case "completed":
-      return decodeTodo("decode completed todo row", {
-        _tag: "CompletedTodo",
-        id: row.id,
-        title: row.title,
-        createdAtMillis: row.created_at_millis,
-        completedAtMillis: row.completed_at_millis ?? 0, // TODO: 확인하기
-      });
-    case "deleted":
-      return decodeTodo("decode deleted todo row", {
-        _tag: "DeletedTodo",
-        id: row.id,
-        title: row.title,
-        createdAtMillis: row.created_at_millis,
-        deletedAtMillis: row.deleted_at_millis ?? 0,
-      });
-  }
-};
+export const completedTodoFromRow = (input: unknown) =>
+  todoFromRow(input).pipe(Effect.flatMap(requireTag("CompletedTodo", "decode completed todo row")));
+
+export const deletedTodoFromRow = (input: unknown) =>
+  todoFromRow(input).pipe(Effect.flatMap(requireTag("DeletedTodo", "decode deleted todo row")));
 
 export const listedTodosFromRows = (
-  rows: ReadonlyArray<TodoRow>,
+  rows: ReadonlyArray<unknown>,
 ): Effect.Effect<ReadonlyArray<ListedTodo>, StorageError> =>
-  Effect.all(rows.map(todoFromRow)) as Effect.Effect<
-    ReadonlyArray<ListedTodo>,
-    StorageError
-  >;
-
-export const completedTodoFromRow = (row: TodoRow) =>
-  decodeCompletedTodo("decode completed todo row", {
-    _tag: "CompletedTodo",
-    id: row.id,
-    title: row.title,
-    createdAtMillis: row.created_at_millis,
-    completedAtMillis: row.completed_at_millis ?? 0, // TODO: 확인하기
-  });
-
-export const deletedTodoFromRow = (row: TodoRow) =>
-  decodeDeletedTodo("decode deleted todo row", {
-    _tag: "DeletedTodo",
-    id: row.id,
-    title: row.title,
-    createdAtMillis: row.created_at_millis,
-    deletedAtMillis: row.deleted_at_millis ?? 0,
-  });
+  Effect.all(rows.map(todoFromRow)).pipe(
+    Effect.map((todos) =>
+      todos.filter((todo): todo is ListedTodo => todo._tag !== "DeletedTodo"),
+    ),
+  );

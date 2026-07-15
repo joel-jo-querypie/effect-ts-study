@@ -1,61 +1,49 @@
-import {
-  HttpRouter,
-  HttpServerRequest,
-  HttpServerResponse,
-} from "@effect/platform";
+import { HttpRouter, HttpServerResponse } from "@effect/platform";
 import { Effect } from "effect";
 import { requestContextLayer } from "../../layers";
 import { addTodo, deleteTodo, doneTodo, listTodos } from "../../programs";
-import {
-  InvalidHttpRequest,
-  type ExpectedHttpError,
-  toErrorResponse,
-} from "./errors";
+import { requestContextFromHeaders } from "./request";
 import {
   CreateTodoRequestDto,
   ListTodosRequestDto,
   TodoIdPathRequestDto,
-  requestContextFromHeaders,
 } from "./request";
 import {
   toDeletedTodoResponseDto,
   toListedTodoResponseDto,
   toTodoResponseDto,
 } from "./response";
+import { toErrorResponse } from "./errors";
 
-const withExpectedHttpErrorResponse = <A, R>(
+const withHttpErrorResponse = <A, E, R>(
   requestId: string,
 ): ((
-  effect: Effect.Effect<A, ExpectedHttpError, R>,
+  effect: Effect.Effect<A, E, R>,
 ) => Effect.Effect<A | HttpServerResponse.HttpServerResponse, never, R>) =>
   Effect.catchAll((error) =>
     Effect.succeed(toErrorResponse(requestId, error)),
   );
 
-const decodeHttpRequest = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  effect.pipe(Effect.mapError(() => new InvalidHttpRequest()));
-
-const requestContextFromCurrentRequest = Effect.gen(function* () {
-  const request = yield* HttpServerRequest.HttpServerRequest;
-  return yield* requestContextFromHeaders({
-    "x-request-id": request.headers["x-request-id"],
-    "x-actor-id": request.headers["x-actor-id"],
-  });
-});
-
 const createTodoHandler = Effect.gen(function* () {
-  const requestContext = yield* requestContextFromCurrentRequest;
-  const request = yield* decodeHttpRequest(
-    HttpRouter.schemaJson(CreateTodoRequestDto),
-  ).pipe(withExpectedHttpErrorResponse(requestContext.requestId));
-
-  if (HttpServerResponse.isServerResponse(request)) {
-    return request;
-  }
+  /**
+   * 실제 HTTP 요청의 headers/body/path params를 읽어,
+   * DTO 모양으로 decode
+   {
+     headers: {
+       "x-request-id"?: string
+       "x-actor-id"?: string
+     }
+     body: {
+       title: string
+     }
+   }
+   */
+  const request = yield* HttpRouter.schemaJson(CreateTodoRequestDto);
+  const requestContext = yield* requestContextFromHeaders(request.headers);
 
   const result = yield* addTodo(request.body.title).pipe(
     Effect.provide(requestContextLayer(requestContext)),
-    withExpectedHttpErrorResponse(requestContext.requestId),
+    withHttpErrorResponse(requestContext.requestId),
   );
 
   if (HttpServerResponse.isServerResponse(result)) {
@@ -66,18 +54,12 @@ const createTodoHandler = Effect.gen(function* () {
 });
 
 const listTodosHandler = Effect.gen(function* () {
-  const requestContext = yield* requestContextFromCurrentRequest;
-  const request = yield* decodeHttpRequest(
-    HttpRouter.schemaNoBody(ListTodosRequestDto),
-  ).pipe(withExpectedHttpErrorResponse(requestContext.requestId));
-
-  if (HttpServerResponse.isServerResponse(request)) {
-    return request;
-  }
+  const request = yield* HttpRouter.schemaNoBody(ListTodosRequestDto);
+  const requestContext = yield* requestContextFromHeaders(request.headers);
 
   const result = yield* listTodos.pipe(
     Effect.provide(requestContextLayer(requestContext)),
-    withExpectedHttpErrorResponse(requestContext.requestId),
+    withHttpErrorResponse(requestContext.requestId),
   );
 
   if (HttpServerResponse.isServerResponse(result)) {
@@ -90,18 +72,12 @@ const listTodosHandler = Effect.gen(function* () {
 });
 
 const completeTodoHandler = Effect.gen(function* () {
-  const requestContext = yield* requestContextFromCurrentRequest;
-  const request = yield* decodeHttpRequest(
-    HttpRouter.schemaNoBody(TodoIdPathRequestDto),
-  ).pipe(withExpectedHttpErrorResponse(requestContext.requestId));
-
-  if (HttpServerResponse.isServerResponse(request)) {
-    return request;
-  }
+  const request = yield* HttpRouter.schemaNoBody(TodoIdPathRequestDto);
+  const requestContext = yield* requestContextFromHeaders(request.headers);
 
   const result = yield* doneTodo(request.pathParams.id).pipe(
     Effect.provide(requestContextLayer(requestContext)),
-    withExpectedHttpErrorResponse(requestContext.requestId),
+    withHttpErrorResponse(requestContext.requestId),
   );
 
   if (HttpServerResponse.isServerResponse(result)) {
@@ -112,18 +88,12 @@ const completeTodoHandler = Effect.gen(function* () {
 });
 
 const deleteTodoHandler = Effect.gen(function* () {
-  const requestContext = yield* requestContextFromCurrentRequest;
-  const request = yield* decodeHttpRequest(
-    HttpRouter.schemaNoBody(TodoIdPathRequestDto),
-  ).pipe(withExpectedHttpErrorResponse(requestContext.requestId));
-
-  if (HttpServerResponse.isServerResponse(request)) {
-    return request;
-  }
+  const request = yield* HttpRouter.schemaNoBody(TodoIdPathRequestDto);
+  const requestContext = yield* requestContextFromHeaders(request.headers);
 
   const result = yield* deleteTodo(request.pathParams.id).pipe(
     Effect.provide(requestContextLayer(requestContext)),
-    withExpectedHttpErrorResponse(requestContext.requestId),
+    withHttpErrorResponse(requestContext.requestId),
   );
 
   if (HttpServerResponse.isServerResponse(result)) {
@@ -138,6 +108,6 @@ const deleteTodoHandler = Effect.gen(function* () {
 export const todoHttpRouter = HttpRouter.empty.pipe(
   HttpRouter.get("/todos", listTodosHandler),
   HttpRouter.post("/todos", createTodoHandler),
-  HttpRouter.post("/todos/:id/complete", completeTodoHandler),
+  HttpRouter.put("/todos/:id/done", completeTodoHandler),
   HttpRouter.del("/todos/:id", deleteTodoHandler),
 );

@@ -8,6 +8,10 @@ export class InvalidTodoTitle extends Data.TaggedError("InvalidTodoTitle")<{
   readonly input: string
 }> {}
 
+export class TodoAlreadyCompleted extends Data.TaggedError("TodoAlreadyCompleted")<{
+  readonly id: string
+}> {}
+
 /**
  *
  * 에러를 어느 정도로 나눠야 할까?

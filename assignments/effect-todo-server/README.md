@@ -144,13 +144,13 @@ audit log는 별도 조회 API로 노출하지 않아도 된다.
 
 ## 테스트
 
-자동 테스트는 HTTP server, SQLite, audit log까지 포함한다.
+자동 테스트는 HTTP server, SQLite migration, audit log, repeated completion, malformed request를 포함한다.
 
 ```bash
 pnpm test
 ```
 
-실제 프로세스를 띄운 뒤 `curl`로 Todo lifecycle과 malformed JSON 오류 응답을 검증하려면 다음을 실행한다.
+실제 프로세스를 띄운 뒤 `curl`로 Todo lifecycle, repeated completion `409`, malformed JSON 오류 응답을 검증하려면 다음을 실행한다.
 테스트는 임시 SQLite DB와 기본 `3010` port를 사용하고, 종료 시 정리한다.
 
 ```bash
@@ -161,4 +161,19 @@ pnpm e2e:http
 
 ```bash
 TODO_E2E_PORT=3011 pnpm e2e:http
+```
+
+`GET /todos`는 bounded offset pagination을 사용한다. 기본 `limit`은 `50`이고 최대는 `100`이다.
+
+```bash
+curl 'http://localhost:3000/todos?limit=20&offset=0'
+```
+
+응답은 다음 페이지가 있을 때 `nextOffset`을 포함한다.
+
+```json
+{
+  "items": [],
+  "nextOffset": 20
+}
 ```

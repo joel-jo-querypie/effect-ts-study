@@ -1,5 +1,6 @@
 import { Clock, Effect } from "effect";
 import { makeActiveTodo } from "../domain/todo";
+import { epochMillisFromNumber } from "../domain/epoch-millis";
 import { makeTodoCreatedEvent } from "../domain/todo-event";
 import { todoTitleFromString } from "../domain/todo-title";
 import { AtomicRunner } from "../services/atomic-runner";
@@ -22,7 +23,9 @@ export const addTodo = (titleInput: string) =>
     const eventStore = yield* TodoEventStore;
     const atomicRunner = yield* AtomicRunner;
     const id = yield* todoIdGenerator.generate;
-    const createdAtMillis = yield* Clock.currentTimeMillis;
+    const createdAtMillis = epochMillisFromNumber(
+      yield* Clock.currentTimeMillis,
+    );
 
     return yield* atomicRunner.run(
       Effect.gen(function* () {

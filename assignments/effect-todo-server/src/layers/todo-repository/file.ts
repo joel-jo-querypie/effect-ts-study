@@ -8,6 +8,7 @@ import {
   type Todo,
   type TodoList as TodoListType,
 } from "../../domain/todo";
+import { TodoAlreadyCompleted } from "../../domain/error";
 import { StorageError, TodoNotFound } from "../../services/errors";
 import { TodoRepository } from "../../services/todo-repository";
 
@@ -60,7 +61,16 @@ export const FileTodoRepositoryLive = Layer.effect(
           return activeTodo;
         }),
 
-      list: readAll.pipe(Effect.map(filterListedTodos)),
+      list: (options) =>
+        readAll.pipe(
+          Effect.map(filterListedTodos),
+          Effect.map((items) => ({
+            items: items.slice(options.offset, options.offset + options.limit),
+            ...(items.length > options.offset + options.limit
+              ? { nextOffset: options.offset + options.limit }
+              : {}),
+          })),
+        ),
 
       markDone: (id, completedAtMillis) =>
         Effect.gen(function* () {
@@ -72,7 +82,7 @@ export const FileTodoRepositoryLive = Layer.effect(
           }
 
           if (foundTodo._tag === "CompletedTodo") {
-            return foundTodo;
+            return yield* Effect.fail(new TodoAlreadyCompleted({ id }));
           }
 
           const completedTodo = makeCompletedTodo(foundTodo, completedAtMillis);

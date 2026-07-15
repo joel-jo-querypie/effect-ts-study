@@ -1,44 +1,37 @@
 import { Schema } from "effect";
+import { EpochMillis } from "./epoch-millis";
 import { TodoId } from "./todo-id";
 import { TodoTitle } from "./todo-title";
 
 const TodoFields = {
   id: TodoId,
   title: TodoTitle,
-  createdAtMillis: Schema.Number,
+  createdAtMillis: EpochMillis,
 };
 
 export const ActiveTodo = Schema.TaggedStruct("ActiveTodo", TodoFields);
 export type ActiveTodo = Schema.Schema.Type<typeof ActiveTodo>;
 
-export const BlockedTodo = Schema.TaggedStruct("BlockedTodo", {
-  ...TodoFields,
-  blockedReason: Schema.String,
-  blockedAtMillis: Schema.Number,
-});
-export type BlockedTodo = Schema.Schema.Type<typeof BlockedTodo>;
-
 export const CompletedTodo = Schema.TaggedStruct("CompletedTodo", {
   ...TodoFields,
-  completedAtMillis: Schema.Number,
+  completedAtMillis: EpochMillis,
 });
 export type CompletedTodo = Schema.Schema.Type<typeof CompletedTodo>;
 
 export const DeletedTodo = Schema.TaggedStruct("DeletedTodo", {
   ...TodoFields,
-  deletedAtMillis: Schema.Number,
+  deletedAtMillis: EpochMillis,
 });
 export type DeletedTodo = Schema.Schema.Type<typeof DeletedTodo>;
 
 export const Todo = Schema.Union(
   ActiveTodo,
-  BlockedTodo,
   CompletedTodo,
   DeletedTodo,
 );
 export type Todo = Schema.Schema.Type<typeof Todo>;
-export type CompletableTodo = ActiveTodo | BlockedTodo;
-export type DeletableTodo = ActiveTodo | BlockedTodo | CompletedTodo;
+export type CompletableTodo = ActiveTodo;
+export type DeletableTodo = ActiveTodo | CompletedTodo;
 export type ListedTodo = DeletableTodo;
 
 export const TodoList = Schema.Array(Todo);
@@ -47,7 +40,7 @@ export type TodoList = Schema.Schema.Type<typeof TodoList>;
 export const makeActiveTodo = (input: {
   readonly id: TodoId;
   readonly title: TodoTitle;
-  readonly createdAtMillis: number;
+  readonly createdAtMillis: EpochMillis;
 }): ActiveTodo => ({
   _tag: "ActiveTodo",
   id: input.id,
@@ -57,7 +50,7 @@ export const makeActiveTodo = (input: {
 
 export const makeCompletedTodo = (
   todo: CompletableTodo,
-  completedAtMillis: number,
+  completedAtMillis: EpochMillis,
 ): CompletedTodo => ({
   _tag: "CompletedTodo",
   id: todo.id,
@@ -68,31 +61,11 @@ export const makeCompletedTodo = (
 
 export const makeDeletedTodo = (
   todo: DeletableTodo,
-  deletedAtMillis: number,
+  deletedAtMillis: EpochMillis,
 ): DeletedTodo => ({
   _tag: "DeletedTodo",
   id: todo.id,
   title: todo.title,
   createdAtMillis: todo.createdAtMillis,
   deletedAtMillis,
-});
-
-export const makeBlockedTodo = (input: {
-  readonly todo: ActiveTodo;
-  readonly blockedReason: string;
-  readonly blockedAtMillis: number;
-}): BlockedTodo => ({
-  _tag: "BlockedTodo",
-  id: input.todo.id,
-  title: input.todo.title,
-  createdAtMillis: input.todo.createdAtMillis,
-  blockedReason: input.blockedReason,
-  blockedAtMillis: input.blockedAtMillis,
-});
-
-export const makeActiveFromBlockedTodo = (todo: BlockedTodo): ActiveTodo => ({
-  _tag: "ActiveTodo",
-  id: todo.id,
-  title: todo.title,
-  createdAtMillis: todo.createdAtMillis,
 });
