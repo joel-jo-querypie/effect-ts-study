@@ -1,5 +1,5 @@
 import { Layer } from "effect";
-import { AtomicRunner } from "../services/atomic-runner";
+import { AtomicRunner } from "../../services/atomic-runner";
 
 export const PassthroughAtomicRunnerLive = Layer.succeed(
   AtomicRunner,

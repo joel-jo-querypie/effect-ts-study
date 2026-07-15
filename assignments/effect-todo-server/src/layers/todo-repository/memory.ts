@@ -5,9 +5,9 @@ import {
   type ListedTodo,
   type Todo,
   type TodoList
-} from "../domain/todo"
-import { TodoNotFound } from "../services/errors"
-import { TodoRepository } from "../services/todo-repository"
+} from "../../domain/todo"
+import { TodoNotFound } from "../../services/errors"
+import { TodoRepository } from "../../services/todo-repository"
 
 export const InMemoryTodoRepositoryLive = Layer.effect(
   TodoRepository,

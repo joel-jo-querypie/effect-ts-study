@@ -7,9 +7,9 @@ import {
   type ListedTodo,
   type Todo,
   type TodoList as TodoListType,
-} from "../domain/todo";
-import { StorageError, TodoNotFound } from "../services/errors";
-import { TodoRepository } from "../services/todo-repository";
+} from "../../domain/todo";
+import { StorageError, TodoNotFound } from "../../services/errors";
+import { TodoRepository } from "../../services/todo-repository";
 
 const todoFile = "todo-list.json";
 

@@ -1,7 +1,7 @@
 import { Effect, Layer, Ref } from "effect";
-import type { TodoEvent } from "../domain/todo-event";
-import { RequestContext } from "../services/request-context";
-import { TodoEventStore } from "../services/todo-event-store";
+import type { TodoEvent } from "../../domain/todo-event";
+import { RequestContext } from "../../services/request-context";
+import { TodoEventStore } from "../../services/todo-event-store";
 
 export const InMemoryTodoEventStoreLive = Layer.effect(
   TodoEventStore,

@@ -1,5 +1,5 @@
 import { Command } from "@effect/cli";
-import { Console, Effect } from "effect";
+import { Console, Effect, Match } from "effect";
 import type { ListedTodo } from "../../domain/todo";
 import { listTodos } from "../../programs";
 
@@ -9,16 +9,24 @@ export const listCommand = Command.make("list", {}, () =>
   listTodos.pipe(Effect.map(renderTodoList), Effect.flatMap(Console.log)),
 );
 
-const renderTodoStatus = (todo: ListedTodo): string => {
-  switch (todo._tag) {
-    case "ActiveTodo":
-      return "[ ]";
-    case "BlockedTodo":
-      return "[!blocked]";
-    case "CompletedTodo":
-      return "[x]";
-  }
-};
+const renderTodoStatus = Match.type<ListedTodo>().pipe(
+  Match.tagsExhaustive({
+    ActiveTodo: () => "[ ]",
+    BlockedTodo: () => "[!blocked]",
+    CompletedTodo: () => "[x]",
+  }),
+);
+
+const renderTodo = Match.type<ListedTodo>().pipe(
+  Match.tagsExhaustive({
+    ActiveTodo: (todo) =>
+      `${renderTodoStatus(todo)} ${todo.id} ${todo.title} created at ${todo.createdAtMillis}(ms)`,
+    BlockedTodo: (todo) =>
+      `${renderTodoStatus(todo)} ${todo.id} ${todo.title} blocked at ${todo.blockedAtMillis}(ms) because ${todo.blockedReason}`,
+    CompletedTodo: (todo) =>
+      `${renderTodoStatus(todo)} ${todo.id} ${todo.title} completed at ${todo.completedAtMillis}(ms)`,
+  }),
+);
 
 // 무슨 일이 일어났는지 Todo Result 타입으로 표기 되었고, 어댑터인 ui 레이어에서 어떻게 보여줄지 결정하는
 const renderTodoList = (todos: ReadonlyArray<ListedTodo>): string => {
@@ -26,22 +34,5 @@ const renderTodoList = (todos: ReadonlyArray<ListedTodo>): string => {
     return "no todos";
   }
 
-  return todos
-    .map((todo) => {
-      switch (todo._tag) {
-        case "ActiveTodo":
-          return `${renderTodoStatus(todo)} ${todo.id} ${todo.title} created at ${todo.createdAtMillis}(ms)`;
-        case "BlockedTodo":
-          return `${renderTodoStatus(todo)} ${todo.id} ${todo.title} blocked at ${todo.blockedAtMillis}(ms) because ${todo.blockedReason}`;
-        case "CompletedTodo":
-          return `${renderTodoStatus(todo)} ${todo.id} ${todo.title} completed at ${todo.completedAtMillis}(ms)`;
-        default:
-          assertNever(todo);
-      }
-    })
-    .join("\n");
+  return todos.map(renderTodo).join("\n");
 };
-
-const assertNever = (value: never): never => {
-  throw new Error(`${value}`)
-}
