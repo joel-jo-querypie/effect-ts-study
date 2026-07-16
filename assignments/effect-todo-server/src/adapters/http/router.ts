@@ -89,10 +89,12 @@ const listTodosHandler = Effect.gen(function* () {
     return request;
   }
 
-  const result = yield* listTodos({
-    limit: request.searchParams.limit ?? 50,
-    offset: request.searchParams.offset ?? 0,
-  }).pipe(
+  // const result = yield* listTodos({
+  //     limit: request.searchParams.limit ?? 50,
+  //     offset: request.searchParams.offset ?? 0,
+  //   }).pipe(
+
+  const result = yield* listTodos(request.searchParams).pipe(
     Effect.provide(requestContextLayer(requestContext)),
     withExpectedHttpErrorResponse(requestContext.requestId),
   );

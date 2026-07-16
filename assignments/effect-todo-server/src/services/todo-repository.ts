@@ -8,12 +8,8 @@ import type {
 import type { EpochMillis } from "../domain/epoch-millis";
 import type { TodoId } from "../domain/todo-id";
 import { StorageError, TodoNotFound } from "./errors";
+import type { PageRequest } from "./page-request";
 import type { TodoAlreadyCompleted } from "../domain/error";
-
-export type ListTodosOptions = {
-  readonly limit: number;
-  readonly offset: number;
-};
 
 export type TodoPage = {
   readonly items: ReadonlyArray<ListedTodo>;
@@ -25,7 +21,7 @@ export class TodoRepository extends Context.Tag("TodoRepository")<
   {
     readonly add: (todo: ActiveTodo) => Effect.Effect<ActiveTodo, StorageError>;
     readonly list: (
-      options: ListTodosOptions,
+      page: PageRequest,
     ) => Effect.Effect<TodoPage, StorageError>;
     readonly markDone: (
       id: TodoId,

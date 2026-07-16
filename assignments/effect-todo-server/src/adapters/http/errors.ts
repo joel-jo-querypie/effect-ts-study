@@ -103,6 +103,7 @@ const errorMapping = Match.type<ExpectedHttpError>().pipe(
       code: "ATOMIC_OPERATION_FAILED",
       message: "Todo change could not be completed atomically.",
     }),
+    
   }),
 );
 

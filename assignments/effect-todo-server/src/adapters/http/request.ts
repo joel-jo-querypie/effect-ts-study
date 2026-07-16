@@ -4,6 +4,10 @@ import {
   RequestId,
   type RequestContextData,
 } from "../../services/request-context";
+import {
+  PageRequest,
+  defaultPageRequest,
+} from "../../services/page-request";
 
 // 클라이언트가 보내지 않아도 요청을 처리할 수 있는 정책으로 optional
 export const HttpHeadersDto = Schema.Struct({
@@ -34,17 +38,29 @@ export type TodoIdPathRequestDto = Schema.Schema.Type<
   typeof TodoIdPathRequestDto
 >;
 
-// ListTodosRequestDto TODO: limit, offset 고민해보기.
+const PageRequestSearchParams = Schema.Struct({
+  limit: Schema.optional(Schema.NumberFromString),
+  offset: Schema.optional(Schema.NumberFromString),
+});
+
+const PageRequestFromSearchParams = Schema.transform(
+  PageRequestSearchParams,
+  PageRequest,
+  {
+    decode: (searchParams) => ({
+      limit: searchParams.limit ?? defaultPageRequest.limit,
+      offset: searchParams.offset ?? defaultPageRequest.offset,
+    }),
+    encode: (page) => ({
+      limit: page.limit,
+      offset: page.offset,
+    }),
+  },
+);
+
 export const ListTodosRequestDto = Schema.Struct({
   headers: HttpHeadersDto,
-  searchParams: Schema.Struct({
-    limit: Schema.optional(
-      Schema.NumberFromString.pipe(Schema.int(), Schema.between(1, 100)),
-    ),
-    offset: Schema.optional(
-      Schema.NumberFromString.pipe(Schema.int(), Schema.nonNegative()),
-    ),
-  }),
+  searchParams: PageRequestFromSearchParams,
 });
 export type ListTodosRequestDto = Schema.Schema.Type<typeof ListTodosRequestDto>;
 
