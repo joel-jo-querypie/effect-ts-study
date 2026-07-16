@@ -1,6 +1,10 @@
 import { SqlClient } from "@effect/sql";
 import { Effect, Layer, Schema } from "effect";
-import type { ActiveTodo } from "../../domain/todo";
+import type {
+  ActiveTodo,
+  CompletedTodo,
+  DeletedTodo,
+} from "../../domain/todo";
 import type { TodoId } from "../../domain/todo-id";
 import { TodoAlreadyCompleted } from "../../domain/error";
 import { TodoNotFound } from "../../services/errors";
@@ -10,6 +14,7 @@ import {
   completedTodoFromRow,
   deletedTodoFromRow,
   listedTodosFromRows,
+  todoFromRow,
 } from "./sqlite-row";
 
 export const SqliteTodoRepositoryLive = Layer.effect(
@@ -77,14 +82,36 @@ export const SqliteTodoRepositoryLive = Layer.effect(
           })),
         ),
 
-      markDone: (id, completedAtMillis) =>
+      find: (id) =>
+        Effect.gen(function* () {
+          const rows = yield* sql<Record<string, unknown>>`
+            SELECT *
+            FROM todos
+            WHERE id = ${id}
+            LIMIT 1
+          `.pipe(Effect.mapError(toStorageError("find todo")));
+
+          const row = rows[0];
+          if (row === undefined) {
+            return yield* Effect.fail(new TodoNotFound({ id }));
+          }
+
+          const todo = yield* todoFromRow(row);
+          if (todo._tag === "DeletedTodo") {
+            return yield* Effect.fail(new TodoNotFound({ id }));
+          }
+
+          return todo;
+        }),
+
+      saveCompletedIfActive: (todo: CompletedTodo) =>
         Effect.gen(function* () {
           const rows = yield* sql<Record<string, unknown>>`
             UPDATE todos
             SET
               status = 'completed',
-              completed_at_millis = ${completedAtMillis}
-            WHERE id = ${id} AND status = 'active'
+              completed_at_millis = ${todo.completedAtMillis}
+            WHERE id = ${todo.id} AND status = 'active'
             RETURNING *
           `.pipe(Effect.mapError(toStorageError("complete todo")));
 
@@ -93,22 +120,22 @@ export const SqliteTodoRepositoryLive = Layer.effect(
             return yield* completedTodoFromRow(completedRow);
           }
 
-          const statuses = yield* findStatus(id);
+          const statuses = yield* findStatus(todo.id);
           if (statuses[0]?.status === "completed") {
-            return yield* Effect.fail(new TodoAlreadyCompleted({ id }));
+            return yield* Effect.fail(new TodoAlreadyCompleted({ id: todo.id }));
           }
 
-          return yield* Effect.fail(new TodoNotFound({ id }));
+          return yield* Effect.fail(new TodoNotFound({ id: todo.id }));
         }),
 
-      delete: (id, deletedAtMillis) =>
+      saveDeletedIfDeletable: (todo: DeletedTodo) =>
         Effect.gen(function* () {
           const rows = yield* sql<Record<string, unknown>>`
             UPDATE todos
             SET
               status = 'deleted',
-              deleted_at_millis = ${deletedAtMillis}
-            WHERE id = ${id} AND status IN ('active', 'completed')
+              deleted_at_millis = ${todo.deletedAtMillis}
+            WHERE id = ${todo.id} AND status IN ('active', 'completed')
             RETURNING *
           `.pipe(Effect.mapError(toStorageError("delete todo")));
 
@@ -117,7 +144,7 @@ export const SqliteTodoRepositoryLive = Layer.effect(
             return yield* deletedTodoFromRow(deletedRow);
           }
 
-          return yield* Effect.fail(new TodoNotFound({ id }));
+          return yield* Effect.fail(new TodoNotFound({ id: todo.id }));
         }),
     });
   }),

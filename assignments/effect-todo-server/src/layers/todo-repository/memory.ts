@@ -1,7 +1,5 @@
 import { Effect, Layer, Ref } from "effect"
 import {
-  makeCompletedTodo,
-  makeDeletedTodo,
   type ListedTodo,
   type Todo,
   type TodoList
@@ -40,7 +38,7 @@ export const InMemoryTodoRepositoryLive = Layer.effect(
           })),
         ),
 
-      markDone: (id, completedAtMillis) =>
+      find: (id) =>
         Effect.gen(function* () {
           const currentTodos = yield* Ref.get(todos)
           const foundTodo = currentTodos.find((todo) => todo.id === id)
@@ -49,32 +47,44 @@ export const InMemoryTodoRepositoryLive = Layer.effect(
             return yield* Effect.fail(new TodoNotFound({ id }))
           }
 
-          if (foundTodo._tag === "CompletedTodo") {
-            return yield* Effect.fail(new TodoAlreadyCompleted({ id }))
+          return foundTodo
+        }),
+
+      saveCompletedIfActive: (completedTodo) =>
+        Effect.gen(function* () {
+          const currentTodos = yield* Ref.get(todos)
+          const foundTodo = currentTodos.find((todo) => todo.id === completedTodo.id)
+
+          if (foundTodo === undefined || foundTodo._tag === "DeletedTodo") {
+            return yield* Effect.fail(new TodoNotFound({ id: completedTodo.id }))
           }
 
-          const completedTodo = makeCompletedTodo(foundTodo, completedAtMillis)
+          if (foundTodo._tag === "CompletedTodo") {
+            return yield* Effect.fail(new TodoAlreadyCompleted({ id: completedTodo.id }))
+          }
+
           yield* replaceAll(
             currentTodos.map((todo) =>
-              todo.id === id ? completedTodo : todo
+              todo.id === completedTodo.id ? completedTodo : todo
             )
           )
 
           return completedTodo
         }),
 
-      delete: (id, deletedAtMillis) =>
+      saveDeletedIfDeletable: (deletedTodo) =>
         Effect.gen(function* () {
           const currentTodos = yield* Ref.get(todos)
-          const foundTodo = currentTodos.find((todo) => todo.id === id)
+          const foundTodo = currentTodos.find((todo) => todo.id === deletedTodo.id)
 
           if (foundTodo === undefined || foundTodo._tag === "DeletedTodo") {
-            return yield* Effect.fail(new TodoNotFound({ id }))
+            return yield* Effect.fail(new TodoNotFound({ id: deletedTodo.id }))
           }
 
-          const deletedTodo = makeDeletedTodo(foundTodo, deletedAtMillis)
           yield* replaceAll(
-            currentTodos.map((todo) => (todo.id === id ? deletedTodo : todo))
+            currentTodos.map((todo) =>
+              todo.id === deletedTodo.id ? deletedTodo : todo
+            )
           )
 
           return deletedTodo
