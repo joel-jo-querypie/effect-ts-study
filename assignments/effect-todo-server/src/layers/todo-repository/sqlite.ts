@@ -1,5 +1,5 @@
 import { SqlClient } from "@effect/sql";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import type { ActiveTodo } from "../../domain/todo";
 import type { TodoId } from "../../domain/todo-id";
 import { TodoAlreadyCompleted } from "../../domain/error";
@@ -17,13 +17,27 @@ export const SqliteTodoRepositoryLive = Layer.effect(
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
 
+    const PersistedTodoStatus = Schema.Literal("active", "completed", "deleted");
+    const TodoStatusRow = Schema.Struct({ status: PersistedTodoStatus });
+
+    // TODO: SQL generic은 TypeScript에만 타입을 알린다. 실제 DB 결과를 파싱한 뒤에만
+    // 이미 완료된 domain 상태 전이인지 판단한다.
     const findStatus = (id: TodoId) =>
-      sql<{ readonly status: "active" | "completed" | "deleted" }>`
+      sql<Record<string, unknown>>`
         SELECT status
         FROM todos
         WHERE id = ${id}
         LIMIT 1
-      `.pipe(Effect.mapError(toStorageError("find todo status")));
+      `.pipe(
+        Effect.mapError(toStorageError("find todo status")),
+        Effect.flatMap((rows) =>
+          Effect.all(
+            rows.map((row) => Schema.decodeUnknown(TodoStatusRow)(row)),
+          ).pipe(
+            Effect.mapError(toStorageError("decode todo status row")),
+          ),
+        ),
+      );
 
     return TodoRepository.of({
       add: (todo: ActiveTodo) =>

@@ -7,8 +7,6 @@ import {
 } from "../../domain/error";
 import {
   AtomicRunnerFailure,
-  PersistenceInvariantViolation,
-  RetryableStorageError,
   StorageError,
   TodoNotFound,
 } from "../../services/errors";
@@ -30,8 +28,6 @@ export type ExpectedHttpError =
   | TodoAlreadyCompleted
   | TodoNotFound
   | StorageError
-  | RetryableStorageError
-  | PersistenceInvariantViolation
   | AtomicRunnerFailure;
 
 type ErrorMapping = {
@@ -49,9 +45,6 @@ type ErrorMapping = {
 
    - 오류 응답에 traceId를 추가한다
    → DTO 조립 부분만 변경
-
-   -RetryableStorageError에 Retry-After header를 붙인다
-   → mapping에 retry metadata를 추가하거나 response 조립을 확장
 
    - StorageError.message에 SQL 상세가 있어도 외부에 노출하지 않는다
    → mapping에서 public message를 고정
@@ -88,22 +81,11 @@ const errorMapping = Match.type<ExpectedHttpError>().pipe(
       code: "STORAGE_ERROR",
       message: "Todo storage failed.",
     }),
-    RetryableStorageError: (): ErrorMapping => ({
-      status: 503,
-      code: "STORAGE_TEMPORARILY_UNAVAILABLE",
-      message: "Todo storage is temporarily unavailable. Please retry.",
-    }),
-    PersistenceInvariantViolation: (): ErrorMapping => ({
-      status: 500,
-      code: "PERSISTENCE_INVARIANT_VIOLATION",
-      message: "Stored Todo data is invalid.",
-    }),
     AtomicRunnerFailure: (): ErrorMapping => ({
       status: 500,
       code: "ATOMIC_OPERATION_FAILED",
       message: "Todo change could not be completed atomically.",
     }),
-    
   }),
 );
 
