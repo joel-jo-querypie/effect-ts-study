@@ -6,5 +6,10 @@
     "lint": "pnpm --filter effect-todo-cli lint && pnpm --filter effect-todo-server lint && pnpm --filter effect-pipeline-runner lint",
     "typecheck": "pnpm --filter effect-todo-cli typecheck && pnpm --filter effect-todo-server typecheck && pnpm --filter effect-pipeline-runner typecheck",
     "test": "pnpm --filter effect-todo-cli test && pnpm --filter effect-todo-server test && pnpm --filter effect-pipeline-runner test"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
   }
 }
