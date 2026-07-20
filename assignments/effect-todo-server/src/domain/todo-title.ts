@@ -5,6 +5,7 @@ export const TodoTitle = Schema.String.pipe(
   Schema.minLength(1),
   Schema.brand("TodoTitle"),
 );
+
 export type TodoTitle = Schema.Schema.Type<typeof TodoTitle>;
 
 export const todoTitleFromString = (

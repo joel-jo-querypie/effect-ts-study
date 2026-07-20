@@ -36,3 +36,15 @@ export const addTodo = (titleInput: string) =>
       }),
     );
   });
+
+
+/*
+* applicaiton(service call, infra) ->
+*
+* todo update, tmp update
+* todo event
+*
+* 트랜잭션은 서비스 아래로 내리지 말아라
+* 다른 엔티티를 쓰지 못하게
+*
+*/
